@@ -9,6 +9,33 @@
 <meta property="og:title" content="¡Nos casamos! · María Fernanda y Brayner Fernando">
 <meta property="og:description" content="Abre tu invitación y confirma tu asistencia.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💍</text></svg>">
+<script>
+/* Muestra el nombre del invitado en el sobre lo antes posible (empieza antes que todo lo demás):
+   primero lo que quedó guardado en este celular y luego una consulta rápida y liviana a Firebase. */
+(function(){
+  var clean = function(s){ return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); };
+  var c = clean(new URLSearchParams(location.search).get("i"));
+  if (!c && location.hash.length > 1 && location.hash !== "#confirmar") c = clean(location.hash.slice(1));
+  if (!c){ try { c = clean(localStorage.getItem("boda-code")); } catch (e) {} }
+  if (!c) return;
+  var name = "", done = false;
+  function paint(){
+    var el = document.getElementById("coverGuest");
+    if (!el || !name) return;
+    el.textContent = "Para: " + name; el.classList.add("on");
+  }
+  function set(n){ if (!n) return; name = n; paint(); try { localStorage.setItem("boda-name-" + c, n); } catch (e) {} }
+  try { name = localStorage.getItem("boda-name-" + c) || ""; } catch (e) {}
+  document.addEventListener("DOMContentLoaded", paint);
+  window.__paintGuest = paint;
+  import("./firebase-config.js").then(function(m){
+    var f = m.firebaseConfig;
+    return fetch("https://firestore.googleapis.com/v1/projects/" + f.projectId + "/databases/(default)/documents/invitados/" + c + "?key=" + f.apiKey);
+  }).then(function(r){ return r && r.ok ? r.json() : null; })
+    .then(function(d){ var n = d && d.fields && d.fields.nombre && d.fields.nombre.stringValue; set(n); })
+    .catch(function(){});
+})();
+</script>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
@@ -198,28 +225,10 @@ footer b{display:block;font-weight:600;font-size:2.2rem;line-height:1.1}
     <span class="seal" aria-hidden="true"><b>M</b><i>B</i></span>
   </button>
   <p class="to" id="coverGuest"></p>
+  <script>window.__paintGuest && window.__paintGuest();</script>
   <p class="tap">Toca el sobre para abrirla</p>
 </div>
-<script>
-/* Muestra el nombre del invitado en el sobre lo antes posible:
-   primero lo que quedó guardado en este celular y luego una consulta rápida y liviana a Firebase. */
-(function(){
-  var clean = function(s){ return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); };
-  var c = clean(new URLSearchParams(location.search).get("i"));
-  if (!c && location.hash.length > 1 && location.hash !== "#confirmar") c = clean(location.hash.slice(1));
-  if (!c){ try { c = clean(localStorage.getItem("boda-code")); } catch (e) {} }
-  if (!c) return;
-  var el = document.getElementById("coverGuest");
-  window.__setGuestName = function(n){ if (!n) return; el.textContent = "Para: " + n; el.classList.add("on"); try { localStorage.setItem("boda-name-" + c, n); } catch (e) {} };
-  try { var saved = localStorage.getItem("boda-name-" + c); if (saved){ el.textContent = "Para: " + saved; el.classList.add("on"); } } catch (e) {}
-  import("./firebase-config.js").then(function(m){
-    var f = m.firebaseConfig;
-    return fetch("https://firestore.googleapis.com/v1/projects/" + f.projectId + "/databases/(default)/documents/invitados/" + c + "?key=" + f.apiKey);
-  }).then(function(r){ return r && r.ok ? r.json() : null; })
-    .then(function(d){ var n = d && d.fields && d.fields.nombre && d.fields.nombre.stringValue; if (n) window.__setGuestName(n); })
-    .catch(function(){});
-})();
-</script>
+
 
 <audio id="audio" src="cancion.mp3" loop preload="auto"></audio>
 
