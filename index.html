@@ -425,22 +425,37 @@ getDoc(doc(db, "config", "evento"))
   .then(s => { if (s.exists()) applyEvent({ ...DEFAULTS, ...s.data() }); })
   .catch(() => {});
 
-/* ---------- fotos ---------- */
+/* ---------- fotos (carrusel automático en bucle) ---------- */
+const timers = {}, reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 function gallery(n, list){
-  const g = $("gallery" + n), dots = $("dots" + n);
-  g.innerHTML = ""; dots.innerHTML = "";
-  $("sec" + n).hidden = !list.length;
-  list.forEach((src, i) => {
+  const g = $("gallery" + n), dots = $("dots" + n), k = list.length;
+  clearInterval(timers[n]); g.innerHTML = ""; dots.innerHTML = "";
+  $("sec" + n).hidden = !k;
+  // con 2 o más fotos se repite la lista para que el bucle no se note
+  (k > 1 ? [...list, ...list] : list).forEach((src, i) => {
     const f = document.createElement("figure");
     const img = new Image(); img.src = src; img.alt = "Foto de los novios"; img.loading = "lazy"; f.append(img);
     g.append(f);
-    const d = document.createElement("span"); if (!i) d.className = "on"; dots.append(d);
+    if (i < k){ const d = document.createElement("span"); if (!i) d.className = "on"; dots.append(d); }
   });
-  dots.hidden = list.length < 2;
+  dots.hidden = k < 2;
+  if (k < 2){ g.onscroll = null; return; }
+  const step = () => g.firstElementChild.offsetWidth + 18;
+  const idx = () => Math.round(g.scrollLeft / step());
+  let settle, busyUntil = 0;
   g.onscroll = () => {
-    const w = g.firstElementChild.offsetWidth + 18, i = Math.round(g.scrollLeft / w);
-    [...dots.children].forEach((d, k) => d.classList.toggle("on", k === i));
+    [...dots.children].forEach((d, i) => d.classList.toggle("on", i === idx() % k));
+    clearTimeout(settle);
+    settle = setTimeout(() => {   // al llegar a la copia, vuelve al original sin que se vea
+      if (idx() >= k) g.scrollTo({ left: g.scrollLeft - k * step(), behavior: "instant" });
+    }, 150);
   };
+  const pause = () => { busyUntil = Date.now() + 6000; };
+  ["pointerdown", "touchstart", "wheel"].forEach(t => g.addEventListener(t, pause, { passive: true }));
+  if (!reduce) timers[n] = setInterval(() => {
+    if (document.hidden || Date.now() < busyUntil || !g.offsetWidth) return;
+    g.scrollTo({ left: (idx() + 1) * step(), behavior: "smooth" });
+  }, 3500);
 }
 function applyPhotos(f){
   gallery(1, f[1].length ? f[1] : DEFAULT_PHOTOS[1]);
