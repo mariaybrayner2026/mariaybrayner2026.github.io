@@ -245,12 +245,7 @@ textarea{width:100%;min-height:80px;resize:vertical}
         <div><label for="evMapa">Link de Google Maps (opcional)</label><input id="evMapa" placeholder="https://maps.app.goo.gl/..."><p class="hint">Si lo dejas vacío, busca el lugar por su nombre y dirección.</p></div>
         <div class="full"><label for="evDressX">Texto del dress code</label><input id="evDressX" placeholder="Por favor asistir con vestimenta formal…"><p class="hint">Si el texto queda vacío y no hay colores, la tarjeta no aparece.</p></div>
         <div class="full"><label>Colores del dress code</label>
-          <div class="row" id="colorRow">
-            <label class="row" style="margin:0;gap:6px"><input type="checkbox" data-cuse="0"><input type="color" data-col="0" style="width:52px;height:40px;padding:2px"></label>
-            <label class="row" style="margin:0;gap:6px"><input type="checkbox" data-cuse="1"><input type="color" data-col="1" style="width:52px;height:40px;padding:2px"></label>
-            <label class="row" style="margin:0;gap:6px"><input type="checkbox" data-cuse="2"><input type="color" data-col="2" style="width:52px;height:40px;padding:2px"></label>
-            <label class="row" style="margin:0;gap:6px"><input type="checkbox" data-cuse="3"><input type="color" data-col="3" style="width:52px;height:40px;padding:2px"></label>
-          </div><p class="hint">Marca la casilla de cada color que quieras mostrar. Toca el cuadro para cambiar el color.</p></div>
+          <div class="row" id="colorRow"></div><p class="hint">Marca la casilla de cada color que quieras mostrar (hasta 8). Toca el cuadro de color para escoger cualquier tono.</p></div>
         <div><label for="evRegaloT">Título del regalo</label><input id="evRegaloT" placeholder="Lluvia de sobres"></div>
         <div><label for="evRegalo">Texto del regalo</label><input id="evRegalo" placeholder="Habrá lluvia de sobres…"><p class="hint">Si título y texto quedan vacíos, no aparece.</p></div>
         <div><label for="evFrase">Frase o versículo</label><input id="evFrase"></div>
@@ -616,13 +611,20 @@ const EV_DEFAULTS = {
   regaloTitulo: "Lluvia de sobres", regalo: "Tu presencia es nuestro mejor regalo. Si deseas tener un detalle con nosotros, habrá lluvia de sobres.",
   frase: "Y sobre todas estas cosas vestíos de amor, que es el vínculo perfecto.", fraseCita: "Colosenses 3:14"
 };
-const SPARE = ["#000000", "#B08D57", "#6B8E7B", "#1F3A5F"];
+const SPARE = ["#000000", "#B08D57", "#6B8E7B", "#1F3A5F", "#7A1F3D", "#D8B4A0", "#4A5D23", "#808080"];
+const NCOL = SPARE.length;
+SPARE.forEach((_, i) => {
+  const l = document.createElement("label"); l.className = "row"; l.style.cssText = "margin:0;gap:6px;border:1px solid var(--line);border-radius:10px;padding:4px 8px";
+  l.innerHTML = `<input type="checkbox" data-cuse="${i}" aria-label="Mostrar color ${i + 1}" style="width:18px;height:18px;margin:0"><input type="color" data-col="${i}" aria-label="Color ${i + 1}" style="width:52px;height:40px;padding:2px">`;
+  $("colorRow").append(l);
+});
+document.querySelectorAll("[data-col]").forEach(c => c.oninput = () => { document.querySelector(`[data-cuse="${c.dataset.col}"]`).checked = true; });
 async function loadEvent(){
   let ev = { ...EV_DEFAULTS };
   try { const s = await getDoc(doc(db, "config", "evento")); if (s.exists()) ev = { ...ev, ...s.data() }; } catch (e) {}
   Object.entries(EV_FIELDS).forEach(([id, k]) => { $(id).value = ev[k] || ""; });
   const cols = String(ev.dressColores || "").split(",").map(c => c.trim()).filter(Boolean);
-  for (let i = 0; i < 4; i++){
+  for (let i = 0; i < NCOL; i++){
     document.querySelector(`[data-col="${i}"]`).value = (cols[i] || SPARE[i]).toLowerCase();
     document.querySelector(`[data-cuse="${i}"]`).checked = !!cols[i];
   }
@@ -633,7 +635,7 @@ $("evForm").onsubmit = async e => {
   const data = {};
   Object.entries(EV_FIELDS).forEach(([id, k]) => { data[k] = $(id).value.trim(); });
   data.iniciales = data.iniciales.toUpperCase();
-  data.dressColores = [0, 1, 2, 3].filter(i => document.querySelector(`[data-cuse="${i}"]`).checked).map(i => document.querySelector(`[data-col="${i}"]`).value.toUpperCase()).join(",");
+  data.dressColores = SPARE.map((_, i) => i).filter(i => document.querySelector(`[data-cuse="${i}"]`).checked).map(i => document.querySelector(`[data-col="${i}"]`).value.toUpperCase()).join(",");
   if (!data.fecha){ m.className = "msg err"; m.textContent = "Escribe la fecha de la boda."; return; }
   if (data.mapa && !/^https?:\/\//.test(data.mapa)){ m.className = "msg err"; m.textContent = "El link de ubicación debe empezar por https://"; return; }
   try { await setDoc(doc(db, "config", "evento"), data); m.className = "msg ok"; m.textContent = "Cambios guardados. Ya se ven en la invitación."; }
